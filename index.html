@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sunset Point - IT Report System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f9fafb;
+        }
+
+        .sunset-gradient {
+            background: linear-gradient(135deg, #ff7e5f 0%, #feb47b 100%);
+        }
+
+        /* PRINT STYLES - KUNCI KEBERHASILAN EKSPORT */
+        @media print {
+            /* Sembunyikan navigasi, form input, dan tombol aksi */
+            .no-print, .action-col, #input-container, .nav-bar {
+                display: none !important;
+            }
+            
+            /* Atur layout agar memenuhi kertas A4 */
+            body {
+                background: white !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+
+            .main-content {
+                width: 100% !important;
+                max-width: 100% !important;
+                padding: 0 !important;
+            }
+
+            .card {
+                box-shadow: none !important;
+                border: 1px solid #eee !important;
+            }
+
+            /* Paksa warna latar belakang muncul di PDF */
+            .sunset-gradient {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .print-header {
+                display: block !important;
+                text-align: center;
+                margin-bottom: 20px;
+            }
+        }
+
+        .print-header { display: none; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto main-content">
+        <!-- Judul Laporan untuk Print -->
+        <div class="print-header">
+            <h1 style="font-size: 24pt; font-weight: bold; color: #ff7e5f;">SUNSET POINT BALI</h1>
+            <p style="font-size: 14pt; color: #666;">IT DEPARTMENT - OPERATIONAL REPORT 2026</p>
+            <hr style="margin: 20px 0; border: 1px solid #eee;">
+        </div>
+
+        <!-- Header Dashboard (Hadir di Web & PDF) -->
+        <header class="mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">IT <span class="text-orange-500">Dashboard</span></h1>
+                <p id="currentDate" class="text-gray-500 font-medium"></p>
+            </div>
+            <div class="flex gap-2 no-print">
+                <button onclick="window.print()" class="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 shadow-lg">
+                    <i class="fas fa-file-pdf"></i> Export PDF (Full)
+                </button>
+                <button onclick="exportToExcel()" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 shadow-lg">
+                    <i class="fas fa-file-excel"></i> Excel
+                </button>
+            </div>
+        </header>
+
+        <!-- Ringkasan Statistik (Hadir di Web & PDF) -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Total Laporan</p>
+                <h2 id="count-total" class="text-4xl font-black text-gray-800">0</h2>
+            </div>
+            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                <p class="text-xs font-bold text-yellow-500 uppercase tracking-widest">Dalam Proses</p>
+                <h2 id="count-pending" class="text-4xl font-black text-gray-800">0</h2>
+            </div>
+            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                <p class="text-xs font-bold text-green-500 uppercase tracking-widest">Selesai</p>
+                <h2 id="count-done" class="text-4xl font-black text-gray-800">0</h2>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Form Input (Hanya Web) -->
+            <div id="input-container" class="lg:col-span-1">
+                <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm sticky top-8">
+                    <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
+                        <i class="fas fa-plus-circle text-orange-500"></i> Input Laporan
+                    </h3>
+                    <form id="itForm" class="space-y-4">
+                        <input type="text" id="staff" placeholder="Nama Staf" required class="w-full p-3 bg-gray-50 border rounded-xl outline-none focus:ring-2 focus:ring-orange-200">
+                        <select id="dept" class="w-full p-3 bg-gray-50 border rounded-xl outline-none">
+                            <option>Front Office</option>
+                            <option>F&B Service</option>
+                            <option>Housekeeping</option>
+                            <option>Engineering</option>
+                            <option>Accounting</option>
+                        </select>
+                        <textarea id="issue" placeholder="Deskripsi kendala IT..." required class="w-full p-3 bg-gray-50 border rounded-xl h-24 outline-none focus:ring-2 focus:ring-orange-200"></textarea>
+                        <button type="submit" class="w-full sunset-gradient text-white py-3 rounded-xl font-bold shadow-md hover:opacity-90 transition-opacity">
+                            SIMPAN DATA
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Tabel Data (Hadir di Web & PDF) -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden card">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 text-gray-500 font-bold uppercase text-[10px]">
+                            <tr>
+                                <th class="p-4">Tanggal</th>
+                                <th class="p-4">Info Staf</th>
+                                <th class="p-4">Masalah</th>
+                                <th class="p-4 action-col">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody" class="divide-y">
+                            <!-- Data -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let db = JSON.parse(localStorage.getItem('sunset_point_it_2026')) || [];
+
+        // Inisialisasi Tanggal
+        document.getElementById('currentDate').innerText = new Date().toLocaleDateString('id-ID', { 
+            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' 
+        });
+
+        const form = document.getElementById('itForm');
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const newData = {
+                id: Date.now(),
+                date: new Date().toLocaleString('id-ID', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'}),
+                staff: document.getElementById('staff').value,
+                dept: document.getElementById('dept').value,
+                issue: document.getElementById('issue').value,
+                status: 'Pending'
+            };
+            db.unshift(newData);
+            updateUI();
+            form.reset();
+        });
+
+        function updateUI() {
+            localStorage.setItem('sunset_point_it_2026', JSON.stringify(db));
+            const body = document.getElementById('tableBody');
+            body.innerHTML = db.map(item => `
+                <tr class="hover:bg-gray-50">
+                    <td class="p-4 font-medium text-gray-500">${item.date}</td>
+                    <td class="p-4">
+                        <div class="font-bold text-gray-800">${item.staff}</div>
+                        <div class="text-[10px] text-orange-500 font-bold">${item.dept}</div>
+                    </td>
+                    <td class="p-4 text-gray-600">
+                        ${item.issue}
+                        <div class="mt-1">
+                            <span class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${item.status === 'Done' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}">
+                                ${item.status}
+                            </span>
+                        </div>
+                    </td>
+                    <td class="p-4 action-col">
+                        <div class="flex gap-2">
+                            <button onclick="toggleStatus(${item.id})" class="text-blue-500 hover:text-blue-700"><i class="fas fa-check-circle"></i></button>
+                            <button onclick="deleteItem(${item.id})" class="text-red-400 hover:text-red-600"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('count-total').innerText = db.length;
+            document.getElementById('count-pending').innerText = db.filter(x => x.status === 'Pending').length;
+            document.getElementById('count-done').innerText = db.filter(x => x.status === 'Done').length;
+        }
+
+        function toggleStatus(id) {
+            const item = db.find(x => x.id === id);
+            item.status = item.status === 'Pending' ? 'Done' : 'Pending';
+            updateUI();
+        }
+
+        function deleteItem(id) {
+            if(confirm('Hapus data ini?')) {
+                db = db.filter(x => x.id !== id);
+                updateUI();
+            }
+        }
+
+        function exportToExcel() {
+            if(db.length === 0) return alert('Data kosong');
+            const ws = XLSX.utils.json_to_sheet(db);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Reports");
+            XLSX.writeFile(wb, "Sunset_Point_IT_2026.xlsx");
+        }
+
+        updateUI();
+    </script>
+</body>
+</html>
